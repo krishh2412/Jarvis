@@ -1,0 +1,18 @@
+# Normalise line endings so a checkout on another machine does not show every
+# file as modified. Without this, git warns on every add and the first commit
+# from a different editor rewrites whole files.
+* text=auto
+
+# PowerShell wants CRLF; some hosts refuse to run a script with LF endings.
+*.ps1 text eol=crlf
+
+*.py    text diff=python
+*.md    text
+*.json  text
+*.jsonl text
+*.spec  text
+
+*.png binary
+*.ico binary
+*.onnx binary
+*.bin binary
