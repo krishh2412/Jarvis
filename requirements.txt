@@ -1,0 +1,96 @@
+# ---- J.A.R.V.I.S. runtime dependencies -------------------------------------
+# Deliberately torch-free. STT runs on CTranslate2, TTS + wake word on ONNX
+# Runtime, and the LLM lives in Ollama's own process. Keeps the packaged .exe
+# around ~700 MB instead of ~3 GB.
+
+# --- LLM -------------------------------------------------------------------
+# 0.6.x is required for the `think` parameter. Qwen3 reasons by default and
+# returns it in a separate `thinking` field; suppressing it measured 9x fewer
+# generated tokens on a tool-calling turn (164 -> 16). The in-prompt
+# /no_think directive does NOT work -- it must be the API field.
+ollama==0.6.2
+httpx==0.28.1
+
+# Optional cloud brain: switch from local JARVIS to Claude at runtime. Only
+# used when the user selects Claude mode and supplies an ANTHROPIC_API_KEY in
+# .env; the app runs fully without these.
+anthropic==0.75.0
+python-dotenv==1.0.1
+
+# --- Speech to text --------------------------------------------------------
+faster-whisper==1.1.1          # Whisper on CTranslate2, 4-8x faster than ref
+
+# CUDA shipped as wheels so there is no system-wide CUDA install to babysit.
+# CTranslate2 needs only the first two. onnxruntime's CUDA provider needs the
+# rest as well, and without them it fails with a bare "LoadLibrary failed with
+# error 126" and silently falls back to CPU -- measured 6.1x realtime TTS with
+# them present versus 2.9x without.
+nvidia-cublas-cu12==12.4.5.8
+# cuDNN must be >= 9.3. faster-whisper's docs still suggest 9.1.0.70, but
+# CTranslate2 4.8 calls cudnnGetLibConfig, which 9.1 does not export -- the
+# process dies with "Could not load symbol cudnnGetLibConfig. Error code 127"
+# and a native abort (no Python traceback) the moment Whisper and Kokoro
+# initialise CUDA in the same process.
+nvidia-cudnn-cu12==9.25.0.15
+nvidia-cuda-runtime-cu12==12.9.79
+nvidia-cufft-cu12==11.4.1.4
+nvidia-curand-cu12==10.3.10.19
+nvidia-nvjitlink-cu12==12.9.86
+
+# --- Wake word -------------------------------------------------------------
+# NOTE: openwakeword depends on `onnxruntime`, which installs into the SAME
+# module directory as `onnxruntime-gpu`. Listing both means whichever pip
+# writes last wins and the loser vanishes silently -- with the CPU build
+# winning, Kokoro would fall back off CUDA with no error at all. So only the
+# GPU package is pinned here (it ships CPUExecutionProvider too, which is all
+# the always-on wake word needs), and setup.ps1 reinstalls it last to undo
+# openwakeword pulling the CPU build back in transitively.
+openwakeword==0.6.0            # ships a pretrained "hey_jarvis" model
+
+# --- Text to speech --------------------------------------------------------
+kokoro-onnx==0.4.9             # Kokoro-82M, Apache 2.0, faster than realtime
+onnxruntime-gpu==1.20.1        # CUDA + CPU execution providers, one install
+espeakng-loader==0.2.4         # phonemiser backend resolution on Windows
+
+# --- Audio I/O -------------------------------------------------------------
+sounddevice==0.5.1
+numpy==2.2.1
+scipy==1.15.1
+webrtcvad-wheels==2.0.14       # voice activity detection for endpointing
+# System-audio loopback so JARVIS can HEAR what the PC plays (a video, a call)
+# and transcribe it, not just the mic. PortAudio in this sounddevice build has
+# no loopback flag, and Realtek "Stereo Mix" misses USB-headset output, so
+# soundcard's WASAPI loopback (which follows the default output device) is used.
+soundcard==0.4.6
+
+# --- Desktop app -----------------------------------------------------------
+# Native Win32 window backed by the WebView2 runtime that ships with Windows
+# 11. HTML is handed to the window as a string and Python is reached through
+# a js_api bridge -- there is no HTTP server, no port and no localhost URL.
+pywebview==5.3.2
+pythonnet==3.0.5               # WebView2 (EdgeChromium) backend for pywebview
+
+# --- PC control ------------------------------------------------------------
+psutil==6.1.1                  # processes, resource stats
+pywin32==308                   # Windows API: windows, shell, power
+uiautomation==2.0.20           # UI tree walking / window control
+pyautogui==0.9.54              # input synthesis, screenshots
+mss==10.0.0                    # fast multi-monitor screen capture
+pyperclip==1.9.0
+pycaw==20240210                # Core Audio: per-app and system volume
+comtypes==1.4.8
+
+# --- Web -------------------------------------------------------------------
+ddgs==9.0.0                    # search without an API key
+trafilatura==2.0.0             # readable text extraction from pages
+
+# --- Icon / imaging --------------------------------------------------------
+Pillow==11.1.0                 # PNG -> multi-resolution .ico for the app icon
+
+# --- Packaging -------------------------------------------------------------
+pyinstaller==6.11.1
+
+# --- Tests -----------------------------------------------------------------
+# Not needed to run JARVIS, only to check that the safety layer still holds.
+# `python -m pytest` from the project root.
+pytest==9.1.1

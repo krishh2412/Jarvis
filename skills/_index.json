@@ -1,0 +1,37 @@
+{
+  "drive_free": {
+    "description": "Report free space on a drive by letter.",
+    "created": "2026-07-24T20:18:36",
+    "updated": "2026-07-24T20:18:36",
+    "runs": 1,
+    "failures": 0
+  },
+  "youtube_search": {
+    "description": "Search YouTube for a query.",
+    "created": "2026-07-24T21:05:39",
+    "updated": "2026-07-24T21:05:39",
+    "runs": 0,
+    "failures": 0
+  },
+  "play_youtube_video": {
+    "description": "Play a specific YouTube video by URL or id.",
+    "created": "2026-07-24T21:05:39",
+    "updated": "2026-07-24T21:05:39",
+    "runs": 0,
+    "failures": 0
+  },
+  "watch_and_hear": {
+    "description": "See the screen and hear the audio together to know what is going on in a video.",
+    "created": "2026-07-24T21:05:39",
+    "updated": "2026-07-24T21:06:29",
+    "runs": 3,
+    "failures": 0
+  },
+  "ask_ai": {
+    "description": "Ask ChatGPT or Gemini a question in the browser (requires login).",
+    "created": "2026-07-24T21:05:39",
+    "updated": "2026-07-24T21:05:39",
+    "runs": 0,
+    "failures": 0
+  }
+}

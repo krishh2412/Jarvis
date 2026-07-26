@@ -1,0 +1,35 @@
+# Secrets — never commit
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.venv-train/
+.pytest_cache/
+
+# Build artifacts
+build/
+dist/
+release/
+
+# Everything under data/ is state, not source, and none of it belongs in
+# version control:
+#
+#   memory/      what JARVIS has learned about Sir and this machine — personal
+#   learning/    the episodic record of every turn — personal
+#   logs/        the audit log — personal
+#   trash/       stashed originals awaiting undo
+#   journal.jsonl  undo entries, full of real paths from this disk
+#   models/      Kokoro + Whisper weights, downloaded by setup (~850 MB)
+#   ollama/      the language models (~24 GB); run.ps1 points OLLAMA_MODELS here
+#   finetune/    datasets built from the episodic logs, adapters, Modelfiles
+#   screenshots/ the last 40 captures of whatever was on screen
+#
+# The directories are recreated on import by jarvis/config.py, so a fresh clone
+# needs nothing here to start.
+data/
+
+# Written by the app itself (set_safety_level saves it), and machine-specific:
+# audio device indices, safety level, window geometry.
+config.json
