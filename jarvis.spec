@@ -279,7 +279,6 @@ hiddenimports += [
     "h11",
     "anyio",
     "certifi",
-    "ddgs",
     "trafilatura",
     "lxml",
     "lxml._elementpath",

@@ -101,6 +101,10 @@ class ClaudeBrain:
                 request["thinking"] = {"type": "disabled"}
 
             final_text = ""
+            turn_actions: list[dict[str, Any]] = []  # for the episodic log
+            prev_sig: tuple | None = None            # last round's tool signature
+            repeat_hits = 0
+
             for _ in range(config.claude.max_tool_rounds):
                 try:
                     response = await client.messages.create(**request)
@@ -132,6 +136,14 @@ class ClaudeBrain:
                     await emit("tool_call", tool=name, args=args,
                                category=self._category(name))
                     result = await asyncio.to_thread(registry.execute, name, args)
+
+                    failed = isinstance(result, dict) and "error" in result
+                    turn_actions.append({
+                        "tool": name,
+                        "ok": not failed,
+                        **({"error": str(result.get("error"))[:200]} if failed else {}),
+                    })
+
                     await emit("tool_result", tool=name, result=result)
                     results.append({
                         "type": "tool_result",
@@ -139,6 +151,27 @@ class ClaudeBrain:
                         "content": json.dumps(result, default=str)[:8000],
                     })
                 messages.append({"role": "user", "content": results})
+
+                # Same loop-breaker JARVIS has: a round identical to the last one
+                # is not making progress, however cleanly each call returns.
+                # Nudge once toward a different approach, then stop and answer.
+                sig = self._calls_signature(tool_uses)
+                repeat_hits = repeat_hits + 1 if sig == prev_sig else 0
+                prev_sig = sig
+
+                if repeat_hits >= 2:
+                    final_text = await self._force_answer(client, request, messages)
+                    break
+                if repeat_hits == 1:
+                    messages.append({
+                        "role": "user",
+                        "content": (
+                            "[Those are the same tool calls as the previous round, "
+                            "returning the same thing — they are not getting you "
+                            "closer. Try a genuinely different tool or approach, or "
+                            "answer with what you already have. Do not repeat them.]"
+                        ),
+                    })
             else:
                 final_text = ("I've gone back and forth on this several times without "
                               "getting there — stopping so I don't make it worse.")
@@ -149,6 +182,17 @@ class ClaudeBrain:
 
             from jarvis.core.brain import speakable
             await emit("reply", text=final_text, speech=speakable(final_text))
+
+            # Episodic memory, exactly as the local brain records it — so a
+            # session spent in Claude mode still teaches the reflection pass, and
+            # the two assistants build one shared history rather than two.
+            try:
+                from jarvis.core import learning
+                learning.log_turn(user_text, turn_actions, final_text,
+                                  assistant="claude")
+            except Exception:  # noqa: BLE001 - logging never breaks a reply
+                pass
+
             return final_text
 
     # ---- helpers -----------------------------------------------------------
@@ -157,6 +201,41 @@ class ClaudeBrain:
     def _category(tool_name: str) -> str:
         entry = registry.REGISTRY.get(tool_name)
         return entry.category if entry else "general"
+
+    @staticmethod
+    def _calls_signature(tool_uses: list[Any]) -> tuple:
+        """Hashable fingerprint of a round's tool calls (names plus arguments)."""
+        sig = []
+        for block in tool_uses:
+            args = block.input if isinstance(block.input, dict) else {}
+            try:
+                args_repr = json.dumps(args, sort_keys=True, default=str)
+            except (TypeError, ValueError):
+                args_repr = str(args)
+            sig.append((block.name, args_repr))
+        return tuple(sorted(sig))
+
+    async def _force_answer(self, client: Any, request: dict[str, Any],
+                            messages: list[dict[str, Any]]) -> str:
+        """One final call with tools withheld, so it answers instead of looping."""
+        messages.append({
+            "role": "user",
+            "content": ("[Stop calling tools. Using only what you already have, "
+                        "give your best plain answer, or say honestly that you "
+                        "could not do it and why.]"),
+        })
+        final_request = {k: v for k, v in request.items() if k != "tools"}
+        final_request["messages"] = messages
+        try:
+            response = await client.messages.create(**final_request)
+            text = " ".join(b.text.strip() for b in response.content
+                            if b.type == "text").strip()
+            if text:
+                return text
+        except Exception:  # noqa: BLE001
+            pass
+        return ("I went in circles on that one and stopped rather than make it "
+                "worse.")
 
     @staticmethod
     def _explain_error(exc: Exception) -> str:

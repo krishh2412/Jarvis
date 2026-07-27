@@ -81,7 +81,9 @@ pycaw==20240210                # Core Audio: per-app and system volume
 comtypes==1.4.8
 
 # --- Web -------------------------------------------------------------------
-ddgs==9.0.0                    # search without an API key
+# NOTE: `ddgs` was removed. Its bundled Rust HTTP client cannot resolve DNS in
+# this environment, so it never returned a result and only added seconds to the
+# error path. web_search hits DuckDuckGo's HTML endpoint via httpx instead.
 trafilatura==2.0.0             # readable text extraction from pages
 
 # --- Icon / imaging --------------------------------------------------------

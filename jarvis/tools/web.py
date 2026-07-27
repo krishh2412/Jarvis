@@ -80,39 +80,19 @@ def web_search(query: str, max_results: int = 6) -> dict:
         query: The search query.
         max_results: How many results to return.
     """
+    # The ddgs library used to sit behind this as a fallback. It was removed:
+    # its bundled Rust HTTP client cannot resolve anything on this machine
+    # (verified again 2026-07-27 — "ConnectError: error sending request"), so it
+    # never once produced a result, and on every failed search it burned seconds
+    # trying four dead backends in turn before giving up. A fallback that cannot
+    # succeed is worse than none: it only adds latency to the error path.
     try:
         results = _search_duckduckgo_html(query, max_results)
-        if results:
-            return {"query": query, "results": results}
-    except Exception:  # noqa: BLE001 - fall through to the library
-        pass
-
-    # Fallback: the ddgs library, trying each backend until one yields results.
-    try:
-        from ddgs import DDGS
-
-        for backend in ("duckduckgo", "google", "yahoo", "brave"):
-            try:
-                with DDGS() as ddgs:
-                    hits = list(ddgs.text(query, max_results=max_results,
-                                          backend=backend))
-                if hits:
-                    return {
-                        "query": query,
-                        "results": [
-                            {
-                                "title": h.get("title", ""),
-                                "url": h.get("href", ""),
-                                "snippet": (h.get("body", "") or "")[:400],
-                            }
-                            for h in hits
-                        ],
-                    }
-            except Exception:  # noqa: BLE001 - try the next backend
-                continue
     except Exception as exc:  # noqa: BLE001
         return {"error": f"search failed: {exc}"}
 
+    if results:
+        return {"query": query, "results": results}
     return {"query": query, "results": [],
             "note": "no results found; try rephrasing the query"}
 
